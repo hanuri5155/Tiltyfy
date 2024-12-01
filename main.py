@@ -5,7 +5,6 @@ import cv2
 import numpy as np
 import os
 
-
 class TiltShiftApp:
     def __init__(self, root):
         """
@@ -23,13 +22,9 @@ class TiltShiftApp:
         self.canvas = tk.Canvas(root, width=700, height=400, bg="gray")
         self.canvas.pack(pady=10)
 
-        # 이미지 업로드 버튼
-        self.upload_button = tk.Button(root, text="Select Image", command=self.select_image)
+        # 이미지, 동영상 업로드 버튼
+        self.upload_button = tk.Button(root, text="Select Image or Video", command=self.select_file)
         self.upload_button.pack(pady=5)
-
-        # 동영상 업로드 버튼
-        self.video_button = tk.Button(root, text="Select Video", command=self.select_video)
-        self.video_button.pack(pady=5)
 
         # 슬라이더를 위한 프레임 (초점 위치, 초점 너비, 흐림 강도)
         self.slider_frame = tk.Frame(root)
@@ -62,7 +57,7 @@ class TiltShiftApp:
         # 색상 및 밝기 강화 체크박스
         self.enhance_var = tk.BooleanVar(value=True)
         self.enhance_checkbox = tk.Checkbutton(root, text="Enhance Colors and Brightness", variable=self.enhance_var,
-                                               command=self.update_preview)
+                                                 command=self.update_preview)
         self.enhance_checkbox.pack(pady=5)
 
         # 초기화 버튼
@@ -80,20 +75,37 @@ class TiltShiftApp:
         self.original_filename = None  # 원본 이미지 파일 이름
 
         # 동영상 중단 플래그 초기화
-        self.stop_video = False
+        self.video_playing = False
 
-    def select_image(self):
+    def select_file(self):
         """
-        파일 탐색기를 열어 이미지를 선택하고 애플리케이션에 로드
+        파일 탐색기를 열어 이미지 또는 동영상을 선택
         """
-        self.stop_video = True  # 이미지 선택 시 동영상 재생 중단
-        file_path = filedialog.askopenfilename(filetypes=[("Image Files", "*.jpg;*.jpeg;*.png")])
+        self.video_playing = False  # 선택 시 기존 동영상 재생 중단
+        file_path = filedialog.askopenfilename(
+            filetypes=[("Image and Video Files", "*.jpg;*.jpeg;*.png;*.mp4;*.avi;*.mov")]
+        )
         if file_path:
-            self.original_filename = os.path.basename(file_path)  # 파일 이름 추출
-            self.original_image = Image.open(file_path).convert("RGB")  # PIL 이미지를 RGB 형식으로 변환
-            self.display_image(self.original_image)  # 선택된 이미지를 화면에 표시
-            self.reset_button.config(state=tk.NORMAL)  # 초기화 버튼 활성화
-            self.save_button.config(state=tk.NORMAL)  # 저장 버튼 활성화
+            # 파일 확장자를 확인하여 처리
+            _, ext = os.path.splitext(file_path)
+            ext = ext.lower()
+            if ext in [".jpg", ".jpeg", ".png"]:  # 이미지 파일
+                self.original_filename = os.path.basename(file_path)
+                self.original_image = Image.open(file_path).convert("RGB")
+                self.display_image(self.original_image)
+
+                # 버튼 활성화
+                self.reset_button.config(state=tk.NORMAL)
+                self.save_button.config(state=tk.NORMAL)
+
+            elif ext in [".mp4", ".avi", ".mov"]:  # 동영상 파일
+                self.original_filename = file_path  # 동영상 파일 경로 저장
+                self.video_playing = True  # 동영상 재생 시작
+                self.play_video(file_path)
+
+                # 버튼 활성화
+                self.reset_button.config(state=tk.NORMAL)
+                self.save_button.config(state=tk.NORMAL)
 
     def display_image(self, image):
         """
@@ -108,109 +120,277 @@ class TiltShiftApp:
         self.canvas.image = image_tk
         self.canvas.create_image(0, 0, anchor=tk.NW, image=image_tk)
 
-    def update_canvas(self, *args):
+        # 이미지 중심선 및 디버깅 로그 업데이트
+        self.update_canvas_image()
+
+    def display_video(self, frame, y_offset, new_height):
         """
-        슬라이더 값에 따라 중심선 및 범위 선 업데이트
+        동영상을 캔버스에 표시하고 중심선 업데이트
         """
-        self.canvas.delete("focus_lines")  # 이전 선 제거
+        canvas_width, canvas_height = 700, 400
 
-        # 슬라이더 값 가져오기 및 비율 변환
-        focus_position = int(self.focus_position_slider.get() * self.image_ratio)  # 초점 위치를 원본 비율로 변환
-        focus_width = int(self.focus_width_slider.get() * self.image_ratio)  # 초점 너비를 원본 비율로 변환
+        # 슬라이더 값 변환 (패딩 및 비율 고려)
+        focus_position_canvas = self.focus_position_slider.get()
+        focus_width_canvas = self.focus_width_slider.get()
 
-        # 캔버스에 맞게 변환된 값 계산
-        focus_position_canvas = int(focus_position / self.image_ratio)  # 캔버스 높이에 맞춘 초점 위치
-        focus_width_canvas = int(focus_width / self.image_ratio)  # 캔버스 높이에 맞춘 초점 너비
+        # 중심선 계산 (패딩 포함)
+        focus_position_effect = max(0, focus_position_canvas - y_offset)
+        focus_width_effect = focus_width_canvas
 
-        # 캔버스에 선 그리기
-        self.focus_line = self.canvas.create_line(
-            0, focus_position_canvas, 700, focus_position_canvas, fill="red", width=2, tags="focus_lines"
+        # 디버깅 출력
+        print(f"[DEBUG] Video Slider focus_position (slider): {focus_position_canvas}")
+        print(f"[DEBUG] Video Slider focus_width (slider): {focus_width_canvas}")
+        print(f"[DEBUG] y_offset: {y_offset}, new_height: {new_height}")
+
+        # 틸트-시프트 효과 적용
+        blur_strength = int(self.blur_strength_slider.get())
+        enhance = self.enhance_var.get()
+        processed_frame = self.tilt_shift(frame, focus_position_effect, focus_width_effect, blur_strength, enhance)
+
+        # 캔버스에 표시
+        frame_image = ImageTk.PhotoImage(Image.fromarray(processed_frame))
+        self.canvas.create_image(0, 0, anchor=tk.NW, image=frame_image)
+        self.canvas.image = frame_image
+
+        # 중심선 업데이트
+        self.update_canvas(canvas_width, canvas_height, focus_position_canvas, focus_width_canvas, new_height)
+
+    def update_canvas(self, canvas_width, canvas_height, focus_position, focus_width, height):
+        """
+        캔버스에 중심선 및 범위 선 업데이트 (이미지와 동영상 공통 사용)
+        """
+        self.canvas.delete("focus_lines")  # 기존 선 제거
+
+        # 슬라이더 값 변환
+        focus_position_canvas = int(focus_position * canvas_height / height)
+        focus_width_canvas = int(focus_width * canvas_height / height)
+
+        # 디버깅 정보
+        print(f"[DEBUG] Canvas focus_position: {focus_position_canvas}, focus_width: {focus_width_canvas}")
+
+        # 중심선 및 범위 선 그리기
+        self.canvas.create_line(
+            0, focus_position_canvas, canvas_width, focus_position_canvas,
+            fill="red", width=2, tags="focus_lines"
         )  # 초점 중심선 (빨간색)
-        self.top_line = self.canvas.create_line(
-            0, focus_position_canvas - focus_width_canvas, 700, focus_position_canvas - focus_width_canvas,
+        self.canvas.create_line(
+            0, focus_position_canvas - focus_width_canvas, canvas_width, focus_position_canvas - focus_width_canvas,
             fill="blue", width=1, dash=(4, 4), tags="focus_lines"
         )  # 초점 상단 경계선 (파란색 점선)
-        self.bottom_line = self.canvas.create_line(
-            0, focus_position_canvas + focus_width_canvas, 700, focus_position_canvas + focus_width_canvas,
+        self.canvas.create_line(
+            0, focus_position_canvas + focus_width_canvas, canvas_width, focus_position_canvas + focus_width_canvas,
             fill="blue", width=1, dash=(4, 4), tags="focus_lines"
         )  # 초점 하단 경계선 (파란색 점선)
+
+    def update_canvas_image(self):
+        """
+        이미지 중심선 및 범위 선 업데이트
+        """
+        if self.original_image:
+            canvas_width, canvas_height = 700, 400
+            height = self.original_image.size[1]
+
+            # 슬라이더 값 변환
+            focus_position = int(self.focus_position_slider.get() * height / canvas_height)
+            focus_width = int(self.focus_width_slider.get() * height / canvas_height)
+
+            # 디버깅 출력
+            print(f"[DEBUG] Image Slider focus_position (slider): {self.focus_position_slider.get()}")
+            print(f"[DEBUG] Image Slider focus_width (slider): {self.focus_width_slider.get()}")
+            print(f"[DEBUG] Image Calculated focus_position: {focus_position}")
+            print(f"[DEBUG] Image Calculated focus_width: {focus_width}")
+            print(f"[DEBUG] Image original_height: {height}, canvas_height: {canvas_height}")
+
+            # 중심선 업데이트
+            self.update_canvas(canvas_width, canvas_height, focus_position, focus_width, height)
+
+    def update_canvas_video(self, y_offset, new_height):
+        """
+        동영상 중심선 및 범위 선 업데이트
+        """
+        canvas_width, canvas_height = 700, 400
+
+        # 슬라이더 값 변환 (패딩 포함)
+        focus_position_canvas = self.focus_position_slider.get()
+        focus_width_canvas = self.focus_width_slider.get()
+
+        # 중심선과 범위 선 계산 (패딩 보정 포함)
+        focus_position = max(0, focus_position_canvas - y_offset)
+        focus_width = focus_width_canvas
+
+        # 디버깅 출력
+        print(f"[DEBUG] Video focus_position: {focus_position}, focus_width: {focus_width}")
+
+        self.update_canvas(canvas_width, canvas_height, focus_position, focus_width, new_height)
 
     def update_preview(self, *args):
         """
         슬라이더 값 변경 시 이미지를 업데이트하여 미리보기 제공
         """
         if self.original_image is not None:
-            # 슬라이더 값을 통해 효과 적용
-            focus_position = int(self.focus_position_slider.get() * self.image_ratio)
-            focus_width = int(self.focus_width_slider.get() * self.image_ratio)
-            blur_strength = int(self.blur_strength_slider.get())
-            enhance = self.enhance_var.get()
+            height = self.original_image.size[1]
+        elif self.video_playing:
+            height = 400  # 동영상 캔버스 기준 높이
+        else:
+            return
 
-            # PIL 이미지를 NumPy 배열로 변환
+        # 슬라이더 값 변환
+        focus_position = int(self.focus_position_slider.get() * height / 400)
+        focus_width = int(self.focus_width_slider.get() * height / 400)
+        blur_strength = int(self.blur_strength_slider.get())
+        enhance = self.enhance_var.get()
+
+        if self.original_image:
             np_image = np.array(self.original_image)
             tilt_shift_result = self.tilt_shift(np_image, focus_position, focus_width, blur_strength, enhance)
-            self.result_image = Image.fromarray(tilt_shift_result)  # NumPy 배열을 PIL 이미지로 변환
-            self.display_image(self.result_image)  # 변환 결과를 캔버스에 표시
-            self.update_canvas()  # 중심선 및 경계선 업데이트
+            self.result_image = Image.fromarray(tilt_shift_result)
+            self.display_image(self.result_image)  # 결과 이미지 표시
+            self.update_canvas(700, 400, focus_position, focus_width, height)
 
     def reset_image(self):
         """
         원본 이미지를 복원하여 초기 상태로 리셋
         """
-        if self.original_image is not None:
+        if self.video_playing:  # 동영상이 재생 중인 경우
+            self.stop_video()  # 동영상 재생 중단
+            self.canvas.delete("all")  # 캔버스 초기화
+            self.video_playing = False
+        elif self.original_image is not None:  # 이미지인 경우
             self.display_image(self.original_image)  # 원본 이미지로 돌아감
             self.result_image = None  # 결과 이미지 초기화
-            self.save_button.config(state=tk.DISABLED)  # 저장 버튼 비활성화
+
+        self.save_button.config(state=tk.DISABLED)  # 저장 버튼 비활성화
 
     def save_image(self):
         """
         변환된 이미지를 저장
         """
-        if self.result_image is not None:
+        if self.result_image is not None:  # 이미지인 경우
             default_filename = os.path.splitext(self.original_filename)[0] + "_Tilt.jpg"
             file_path = filedialog.asksaveasfilename(defaultextension=".jpg", initialfile=default_filename,
                                                      filetypes=[("JPEG", "*.jpg"), ("PNG", "*.png")])
             if file_path:
                 self.result_image.save(file_path, "JPEG")  # 결과 이미지를 JPEG 형식으로 저장
                 messagebox.showinfo("Save Image", "Image saved successfully!")  # 저장 완료 메시지
+        elif self.video_playing:  # 동영상인 경우
+            default_filename = os.path.splitext(self.original_filename)[0] + "_Tilt.mp4"
+            file_path = filedialog.asksaveasfilename(defaultextension=".mp4", initialfile=default_filename,
+                                                     filetypes=[("MP4", "*.mp4"), ("AVI", "*.avi")])
+            if file_path:
+                self.save_video(file_path)  # 동영상 저장 로직 호출
+                messagebox.showinfo("Save Video", "Video saved successfully!")  # 저장 완료 메시지
 
-    def select_video(self):
-        file_path = filedialog.askopenfilename(filetypes=[("Video Files", "*.mp4;*.avi;*.mov")])
-        if file_path:
-            self.stop_video = False  # 동영상 재생 중단 플래그 초기화
-            self.play_video(file_path)
+    def save_video(self, output_path):
+        """
+        변환된 동영상을 저장
+        """
+        if not self.original_filename:
+            messagebox.showerror("Error", "No video file selected.")
+            return
+
+        cap = cv2.VideoCapture(self.original_filename)  # 원본 동영상 열기
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # MP4 코덱 설정
+        fps = int(cap.get(cv2.CAP_PROP_FPS))  # 프레임 속도 가져오기
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))  # 원본 동영상 너비
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))  # 원본 동영상 높이
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))  # 동영상 저장 설정
+
+        # 디버깅 출력
+        print(f"[DEBUG] Original width: {width}, Original height: {height}, FPS: {fps}")
+
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            # 슬라이더 값 변환 (원본 해상도 기준)
+            focus_position_canvas = self.focus_position_slider.get()
+            focus_width_canvas = self.focus_width_slider.get()
+
+            # 슬라이더 값을 원본 해상도에 맞게 변환
+            focus_position_effect = int(focus_position_canvas * height / 400)
+            focus_width_effect = int(focus_width_canvas * height / 400)
+
+            # 디버깅 출력
+            print(f"[DEBUG] Slider focus_position: {focus_position_canvas}, Converted: {focus_position_effect}")
+            print(f"[DEBUG] Slider focus_width: {focus_width_canvas}, Converted: {focus_width_effect}")
+
+            # 틸트-시프트 효과 적용
+            blur_strength = int(self.blur_strength_slider.get())
+            enhance = self.enhance_var.get()
+            processed_frame = self.tilt_shift(frame, focus_position_effect, focus_width_effect, blur_strength, enhance)
+
+            # 색감 보정 적용 (필요 시)
+            if enhance:
+                print("[DEBUG] Applying color boost...")
+                processed_frame = self.boost_colors(processed_frame)
+
+            # 동영상 저장
+            out.write(processed_frame)  # BGR로 저장
+
+        cap.release()
+        out.release()
+        messagebox.showinfo("Save Video", "Video saved successfully!")
 
     def play_video(self, file_path):
+        """
+        원본 비율을 유지하면서 동영상을 캔버스에 표시하고 슬라이더 적용
+        """
         cap = cv2.VideoCapture(file_path)
 
         def video_loop():
-            if not self.stop_video and cap.isOpened():
+            if self.video_playing and cap.isOpened():
                 ret, frame = cap.read()
+                if not ret:
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # 동영상 끝나면 반복 재생
+                    ret, frame = cap.read()
+
                 if ret:
-                    # OpenCV 이미지를 RGB로 변환 및 리사이즈
+                    # BGR -> RGB 변환
                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    frame = cv2.resize(frame, (700, 400))
-                    frame_image = ImageTk.PhotoImage(Image.fromarray(frame))
 
-                    # 캔버스에 표시
-                    self.canvas.create_image(0, 0, anchor=tk.NW, image=frame_image)
-                    self.canvas.image = frame_image
+                    # 원본 비율 유지하며 캔버스 크기에 맞게 리사이즈
+                    height, width, _ = frame.shape
+                    canvas_width, canvas_height = 700, 400
+                    scale = min(canvas_width / width, canvas_height / height)  # 스케일 계산
+                    new_width = int(width * scale)  # 새 너비
+                    new_height = int(height * scale)  # 새 높이
 
-                    # 다음 프레임 호출
-                    self.root.after(30, video_loop)
-                else:
-                    cap.release()  # 동영상 종료 시 자원 해제
+                    # 디버깅 출력: 리사이즈 및 스케일 정보
+                    print(f"[DEBUG] Original width: {width}, height: {height}")
+                    print(f"[DEBUG] Scale: {scale}")
+                    print(f"[DEBUG] Resized width: {new_width}, Resized height: {new_height}")
 
-        video_loop()  # 재생 시작
+                    # 패딩 추가 (중앙 정렬)
+                    padded_frame = np.zeros((canvas_height, canvas_width, 3), dtype=np.uint8)
+                    y_offset = (canvas_height - new_height) // 2
+                    x_offset = (canvas_width - new_width) // 2
+                    padded_frame[y_offset:y_offset + new_height, x_offset:x_offset + new_width] = cv2.resize(frame, (
+                        new_width, new_height))
+
+                    # 디버깅 출력: 패딩 정보
+                    print(f"[DEBUG] y_offset: {y_offset}, x_offset: {x_offset}")
+                    print(f"[DEBUG] Canvas size: {canvas_width}x{canvas_height}")
+                    print(f"[DEBUG] New frame size: {new_width}x{new_height}")
+
+                    # 동영상 표시 및 중심선 업데이트
+                    self.display_video(padded_frame, y_offset, new_height)
+
+                # 다음 프레임 호출
+                self.root.after(30, video_loop)
+
+        self.video_playing = True
+        video_loop()
 
     # 종료 로직 추가
     def stop_video(self):
-        self.stop_video = True
+        self.video_playing = False
+
 
 
     def tilt_shift(self, image, focus_position, focus_width, blur_strength, enhance):
         """
-        틸트 시프트 효과 생성
+        틸트-시프트 효과 생성, 슬라이더 값은 원본 크기에 맞게 변환됨
         """
         height, width, _ = image.shape
         mask = np.zeros((height, width), dtype=np.float32)
@@ -220,39 +400,33 @@ class TiltShiftApp:
         focus_width = min(focus_width, max_focus_width)
 
         # 블러 처리 시작 범위를 초점 너비에 비례하여 설정
-        blur_start = focus_width * 1.5  # 초점 너비에 따라 블러 처리 시작 거리 설정
+        blur_start = focus_width * 1.5
 
         for i in range(height):
             distance = abs(i - focus_position)
 
             if distance <= focus_width:
-                # 초점 영역: 선명한 값을 유지
                 mask[i, :] = 1
             elif distance <= focus_width + blur_start:
-                # 초점 영역과 블러 처리 영역 사이의 선형 감소 (점진적 블러 처리)
                 decay_factor = (distance - focus_width) / blur_start
-                mask[i, :] = max(0, 1 - decay_factor)  # 선형 감소
+                mask[i, :] = max(0, 1 - decay_factor)
             else:
-                # 블러 처리 영역 : 이 영역에서는 원본 이미지가 사용되지 않고 블러 처리된 이미지만 사용
                 mask[i, :] = 0
 
         # 블러 처리
-        kernel_size = max(3, blur_strength | 1)  # 홀수 보장 -> 가우시안 블러 연산에서 커널 크기는 홀수여야만 중심 픽셀이 올바르게 계산되므로
+        kernel_size = max(3, blur_strength | 1)
         blurred_image = cv2.GaussianBlur(image, (kernel_size, kernel_size), 0)
 
         # 마스크를 3채널로 확장 (R, G, B)
         mask_3ch = cv2.merge([mask, mask, mask])
 
-        # 원본 이미지에서 선명한 영역 + 블러 처리된 이미지에서 흐릿한 영역
+        # 원본 이미지와 블러 이미지 결합
         tilt_shift_image = image * mask_3ch + blurred_image * (1 - mask_3ch)
 
-        # 체크 박스를 체크할때만 색감 보정(boost_colors) 적용
         if enhance:
             tilt_shift_image = self.boost_colors(tilt_shift_image)
 
-        # uint8로 변환하여 반환
-        tilt_shift_image = tilt_shift_image.clip(0, 255).astype(np.uint8)
-        return tilt_shift_image
+        return tilt_shift_image.clip(0, 255).astype(np.uint8)
 
     def boost_colors(self, image):
         """
@@ -274,8 +448,8 @@ class TiltShiftApp:
 
         return np.array(enhanced_image, dtype=np.uint8)
 
-
 if __name__ == "__main__":
+
     root = tk.Tk()
     app = TiltShiftApp(root)
     root.mainloop()
