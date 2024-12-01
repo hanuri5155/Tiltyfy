@@ -289,7 +289,7 @@ class TiltShiftApp:
             return
 
         cap = cv2.VideoCapture(self.original_filename)  # 원본 동영상 열기
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # MP4 코덱 설정
+        fourcc = cv2.CAP_PROP_FPS  # MP4 코덱 설정
         fps = int(cap.get(cv2.CAP_PROP_FPS))  # 프레임 속도 가져오기
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))  # 원본 동영상 너비
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))  # 원본 동영상 높이
