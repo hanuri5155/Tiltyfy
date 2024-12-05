@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import os
 
+
 class TiltShiftApp:
     def __init__(self, root):
         """
@@ -56,8 +57,9 @@ class TiltShiftApp:
 
         # 색상 및 밝기 강화 체크박스
         self.enhance_var = tk.BooleanVar(value=True)
-        self.enhance_checkbox = tk.Checkbutton(root, text="Enhance Colors and Brightness", variable=self.enhance_var,
-                                                 command=self.update_preview)
+        self.enhance_checkbox = tk.Checkbutton(root, text="Enhance Colors and Brightness",
+                                               variable=self.enhance_var,
+                                               command=self.update_preview)
         self.enhance_checkbox.pack(pady=5)
 
         # 초기화 버튼
@@ -138,9 +140,9 @@ class TiltShiftApp:
         focus_width_effect = focus_width_canvas
 
         # 디버깅 출력
-        print(f"[DEBUG] Video Slider focus_position (slider): {focus_position_canvas}")
-        print(f"[DEBUG] Video Slider focus_width (slider): {focus_width_canvas}")
-        print(f"[DEBUG] y_offset: {y_offset}, new_height: {new_height}")
+        # print(f"[DEBUG] Video Slider focus_position (slider): {focus_position_canvas}")
+        # print(f"[DEBUG] Video Slider focus_width (slider): {focus_width_canvas}")
+        # print(f"[DEBUG] y_offset: {y_offset}, new_height: {new_height}")
 
         # 틸트-시프트 효과 적용
         blur_strength = int(self.blur_strength_slider.get())
@@ -195,11 +197,11 @@ class TiltShiftApp:
             focus_width = int(self.focus_width_slider.get() * height / canvas_height)
 
             # 디버깅 출력
-            print(f"[DEBUG] Image Slider focus_position (slider): {self.focus_position_slider.get()}")
-            print(f"[DEBUG] Image Slider focus_width (slider): {self.focus_width_slider.get()}")
-            print(f"[DEBUG] Image Calculated focus_position: {focus_position}")
-            print(f"[DEBUG] Image Calculated focus_width: {focus_width}")
-            print(f"[DEBUG] Image original_height: {height}, canvas_height: {canvas_height}")
+            # print(f"[DEBUG] Image Slider focus_position (slider): {self.focus_position_slider.get()}")
+            # print(f"[DEBUG] Image Slider focus_width (slider): {self.focus_width_slider.get()}")
+            # print(f"[DEBUG] Image Calculated focus_position: {focus_position}")
+            # print(f"[DEBUG] Image Calculated focus_width: {focus_width}")
+            # print(f"[DEBUG] Image original_height: {height}, canvas_height: {canvas_height}")
 
             # 중심선 업데이트
             self.update_canvas(canvas_width, canvas_height, focus_position, focus_width, height)
@@ -271,14 +273,13 @@ class TiltShiftApp:
                                                      filetypes=[("JPEG", "*.jpg"), ("PNG", "*.png")])
             if file_path:
                 self.result_image.save(file_path, "JPEG")  # 결과 이미지를 JPEG 형식으로 저장
-                messagebox.showinfo("Save Image", "Image saved successfully!")  # 저장 완료 메시지
+                messagebox.showinfo("Save Image", "Image saved successfully!")  # 이미지 저장 완료 메시지
         elif self.video_playing:  # 동영상인 경우
             default_filename = os.path.splitext(self.original_filename)[0] + "_Tilt.mp4"
             file_path = filedialog.asksaveasfilename(defaultextension=".mp4", initialfile=default_filename,
                                                      filetypes=[("MP4", "*.mp4"), ("AVI", "*.avi")])
             if file_path:
                 self.save_video(file_path)  # 동영상 저장 로직 호출
-                messagebox.showinfo("Save Video", "Video saved successfully!")  # 저장 완료 메시지
 
     def save_video(self, output_path):
         """
@@ -289,14 +290,11 @@ class TiltShiftApp:
             return
 
         cap = cv2.VideoCapture(self.original_filename)  # 원본 동영상 열기
-        fourcc = cv2.CAP_PROP_FPS  # MP4 코덱 설정
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # MP4 코덱 설정
         fps = int(cap.get(cv2.CAP_PROP_FPS))  # 프레임 속도 가져오기
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))  # 원본 동영상 너비
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))  # 원본 동영상 높이
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))  # 동영상 저장 설정
-
-        # 디버깅 출력
-        print(f"[DEBUG] Original width: {width}, Original height: {height}, FPS: {fps}")
 
         while cap.isOpened():
             ret, frame = cap.read()
@@ -311,18 +309,14 @@ class TiltShiftApp:
             focus_position_effect = int(focus_position_canvas * height / 400)
             focus_width_effect = int(focus_width_canvas * height / 400)
 
-            # 디버깅 출력
-            print(f"[DEBUG] Slider focus_position: {focus_position_canvas}, Converted: {focus_position_effect}")
-            print(f"[DEBUG] Slider focus_width: {focus_width_canvas}, Converted: {focus_width_effect}")
-
             # 틸트-시프트 효과 적용
             blur_strength = int(self.blur_strength_slider.get())
             enhance = self.enhance_var.get()
-            processed_frame = self.tilt_shift(frame, focus_position_effect, focus_width_effect, blur_strength, enhance)
+            processed_frame = self.tilt_shift(frame, focus_position_effect, focus_width_effect, blur_strength,
+                                              enhance)
 
             # 색감 보정 적용 (필요 시)
             if enhance:
-                print("[DEBUG] Applying color boost...")
                 processed_frame = self.boost_colors(processed_frame)
 
             # 동영상 저장
@@ -330,7 +324,7 @@ class TiltShiftApp:
 
         cap.release()
         out.release()
-        messagebox.showinfo("Save Video", "Video saved successfully!")
+        messagebox.showinfo("Save Video", f"Video saved successfully to {output_path}!")  # 동영상 저장 완료 메시지
 
     def play_video(self, file_path):
         """
@@ -357,21 +351,23 @@ class TiltShiftApp:
                     new_height = int(height * scale)  # 새 높이
 
                     # 디버깅 출력: 리사이즈 및 스케일 정보
-                    print(f"[DEBUG] Original width: {width}, height: {height}")
-                    print(f"[DEBUG] Scale: {scale}")
-                    print(f"[DEBUG] Resized width: {new_width}, Resized height: {new_height}")
+                    # print(f"[DEBUG] Original width: {width}, height: {height}")
+                    # print(f"[DEBUG] Scale: {scale}")
+                    # print(f"[DEBUG] Resized width: {new_width}, Resized height: {new_height}")
 
                     # 패딩 추가 (중앙 정렬)
                     padded_frame = np.zeros((canvas_height, canvas_width, 3), dtype=np.uint8)
                     y_offset = (canvas_height - new_height) // 2
                     x_offset = (canvas_width - new_width) // 2
-                    padded_frame[y_offset:y_offset + new_height, x_offset:x_offset + new_width] = cv2.resize(frame, (
-                        new_width, new_height))
+                    padded_frame[y_offset:y_offset + new_height, x_offset:x_offset + new_width] = cv2.resize(frame,
+                                                                                                             (
+                                                                                                                 new_width,
+                                                                                                                 new_height))
 
                     # 디버깅 출력: 패딩 정보
-                    print(f"[DEBUG] y_offset: {y_offset}, x_offset: {x_offset}")
-                    print(f"[DEBUG] Canvas size: {canvas_width}x{canvas_height}")
-                    print(f"[DEBUG] New frame size: {new_width}x{new_height}")
+                    # print(f"[DEBUG] y_offset: {y_offset}, x_offset: {x_offset}")
+                    # print(f"[DEBUG] Canvas size: {canvas_width}x{canvas_height}")
+                    # print(f"[DEBUG] New frame size: {new_width}x{new_height}")
 
                     # 동영상 표시 및 중심선 업데이트
                     self.display_video(padded_frame, y_offset, new_height)
@@ -385,8 +381,6 @@ class TiltShiftApp:
     # 종료 로직 추가
     def stop_video(self):
         self.video_playing = False
-
-
 
     def tilt_shift(self, image, focus_position, focus_width, blur_strength, enhance):
         """
@@ -449,7 +443,6 @@ class TiltShiftApp:
         return np.array(enhanced_image, dtype=np.uint8)
 
 if __name__ == "__main__":
-
     root = tk.Tk()
     app = TiltShiftApp(root)
     root.mainloop()
