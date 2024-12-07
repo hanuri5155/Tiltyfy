@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
+from tkinter.font import Font
 from PIL import Image, ImageTk, ImageEnhance
 import cv2
 import numpy as np
@@ -11,36 +12,47 @@ class TiltShiftApp:
         """
         애플리케이션 초기화: UI 구성 요소 및 변수 정의
         """
+        # 루트 창 설정
         self.root = root
-        self.root.title("Tiltyfy")  # 애플리케이션 제목 설정
-        self.root.geometry("800x850")  # 창 크기 설정
+        self.root.title("Tiltypy Studio")  # 애플리케이션 제목 설정
+        self.root.geometry("900x950")  # 창 크기 설정
+        self.root.configure(bg="#f0f0f5")  # 배경 색상 설정
 
-        # UI 구성 요소: 설명 라벨
-        self.label = tk.Label(root, text="Choose an image to apply Tilt-Shift effect")
+        # 커스텀 폰트 설정
+        title_font = Font(family="Helvetica", size=18, weight="bold")
+        button_font = Font(family="Helvetica", size=12)
+
+        # 헤더 라벨
+        header = tk.Label(root, text="Tiltypy Studio", font=title_font, bg="#f0f0f5", fg="#333")
+        header.pack(pady=20)
+
+        # 설명 라벨
+        self.label = tk.Label(root, text="Choose an image or video to apply effects",
+                              font=("Helvetica", 12), bg="#f0f0f5", fg="#555")
         self.label.pack(pady=10)
 
-        # 이미지를 표시할 캔버스
-        self.canvas = tk.Canvas(root, width=700, height=400, bg="gray")
-        self.canvas.pack(pady=10)
+        # 캔버스: 이미지/영상 미리보기
+        self.canvas = tk.Canvas(root, width=800, height=450, bg="gray", relief="ridge", bd=2)
+        self.canvas.pack(pady=20)
 
-        # 이미지, 동영상 업로드 버튼
-        self.upload_button = tk.Button(root, text="Select Image or Video", command=self.select_file)
-        self.upload_button.pack(pady=5)
+        # 파일 업로드 버튼
+        self.upload_button = tk.Button(root, text="Upload Image/Video", font=button_font, command=self.select_file)
+        self.upload_button.pack(pady=10)
 
-        # 슬라이더를 위한 프레임 (초점 위치, 초점 너비, 흐림 강도)
-        self.slider_frame = tk.Frame(root)
-        self.slider_frame.pack(pady=10)
+        # 슬라이더 프레임
+        self.slider_frame = tk.Frame(root, bg="#f0f0f5")
+        self.slider_frame.pack(pady=20)
 
         # 초점 위치 슬라이더
-        self.focus_position_label = tk.Label(self.slider_frame, text="Focus Position")
+        self.focus_position_label = tk.Label(self.slider_frame, text="Focus Position", bg="#f0f0f5")
         self.focus_position_label.grid(row=0, column=0, padx=10)
         self.focus_position_slider = tk.Scale(self.slider_frame, from_=0, to=400, orient="horizontal", length=300,
-                                              command=self.update_preview)  # 슬라이더 변경 시 미리보기 업데이트
+                                              command=self.update_preview)
         self.focus_position_slider.set(200)
         self.focus_position_slider.grid(row=0, column=1, padx=10)
 
         # 초점 너비 슬라이더
-        self.focus_width_label = tk.Label(self.slider_frame, text="Focus Width")
+        self.focus_width_label = tk.Label(self.slider_frame, text="Focus Width", bg="#f0f0f5")
         self.focus_width_label.grid(row=1, column=0, padx=10)
         self.focus_width_slider = tk.Scale(self.slider_frame, from_=10, to=200, orient="horizontal", length=300,
                                            command=self.update_preview)
@@ -48,27 +60,33 @@ class TiltShiftApp:
         self.focus_width_slider.grid(row=1, column=1, padx=10)
 
         # 흐림 강도 슬라이더
-        self.blur_strength_label = tk.Label(self.slider_frame, text="Blur Strength")
+        self.blur_strength_label = tk.Label(self.slider_frame, text="Blur Strength", bg="#f0f0f5")
         self.blur_strength_label.grid(row=2, column=0, padx=10)
         self.blur_strength_slider = tk.Scale(self.slider_frame, from_=21, to=81, orient="horizontal", length=300,
                                              resolution=2, command=self.update_preview)
         self.blur_strength_slider.set(15)
         self.blur_strength_slider.grid(row=2, column=1, padx=10)
 
-        # 색상 및 밝기 강화 체크박스
+        # 체크박스: 색상 및 밝기 강화
         self.enhance_var = tk.BooleanVar(value=True)
         self.enhance_checkbox = tk.Checkbutton(root, text="Enhance Colors and Brightness",
-                                               variable=self.enhance_var,
+                                               variable=self.enhance_var, bg="#f0f0f5",
                                                command=self.update_preview)
-        self.enhance_checkbox.pack(pady=5)
+        self.enhance_checkbox.pack(pady=10)
+
+        # 버튼 프레임
+        self.button_frame = tk.Frame(root, bg="#f0f0f5")
+        self.button_frame.pack(pady=20)
 
         # 초기화 버튼
-        self.reset_button = tk.Button(root, text="Reset", command=self.reset_image, state=tk.DISABLED)
-        self.reset_button.pack(pady=5)
+        self.reset_button = tk.Button(self.button_frame, text="Reset", font=button_font, command=self.reset_image,
+                                      state=tk.DISABLED)
+        self.reset_button.grid(row=0, column=0, padx=10)
 
         # 저장 버튼
-        self.save_button = tk.Button(root, text="Save Result", command=self.save_image, state=tk.DISABLED)
-        self.save_button.pack(pady=5)
+        self.save_button = tk.Button(self.button_frame, text="Save Result", font=button_font, command=self.save_image,
+                                     state=tk.DISABLED)
+        self.save_button.grid(row=0, column=1, padx=10)
 
         # 이미지 관련 변수 초기화
         self.original_image = None  # 원본 이미지 저장
@@ -115,9 +133,9 @@ class TiltShiftApp:
         """
         self.canvas.delete("all")  # 기존 캔버스 내용 삭제
         original_width, original_height = image.size
-        resized_height = 400  # 캔버스 높이에 맞게 이미지 리사이즈
+        resized_height = 450  # 캔버스 높이에 맞게 이미지 리사이즈
         self.image_ratio = original_height / resized_height  # 크기 비율 계산
-        resized_image = image.resize((700, resized_height), Image.LANCZOS)  # 고품질 리사이즈
+        resized_image = image.resize((800, resized_height), Image.Resampling.LANCZOS)  # 고품질 리사이즈
         image_tk = ImageTk.PhotoImage(resized_image)  # tkinter에서 표시 가능한 형식으로 변환
         self.canvas.image = image_tk
         self.canvas.create_image(0, 0, anchor=tk.NW, image=image_tk)
@@ -129,7 +147,7 @@ class TiltShiftApp:
         """
         동영상을 캔버스에 표시하고 중심선 업데이트
         """
-        canvas_width, canvas_height = 700, 400
+        canvas_width, canvas_height = 800, 450
 
         # 슬라이더 값 변환 (패딩 및 비율 고려)
         focus_position_canvas = self.focus_position_slider.get()
@@ -139,18 +157,27 @@ class TiltShiftApp:
         focus_position_effect = max(0, focus_position_canvas - y_offset)
         focus_width_effect = focus_width_canvas
 
-        # 디버깅 출력
-        # print(f"[DEBUG] Video Slider focus_position (slider): {focus_position_canvas}")
-        # print(f"[DEBUG] Video Slider focus_width (slider): {focus_width_canvas}")
-        # print(f"[DEBUG] y_offset: {y_offset}, new_height: {new_height}")
-
         # 틸트-시프트 효과 적용
         blur_strength = int(self.blur_strength_slider.get())
         enhance = self.enhance_var.get()
         processed_frame = self.tilt_shift(frame, focus_position_effect, focus_width_effect, blur_strength, enhance)
 
+        # 캔버스 크기에 맞게 프레임 리사이즈
+        frame_height, frame_width = processed_frame.shape[:2]
+        aspect_ratio = frame_width / frame_height
+
+        if aspect_ratio > canvas_width / canvas_height:  # 가로 기준 리사이즈
+            resized_width = canvas_width
+            resized_height = int(canvas_width / aspect_ratio)
+        else:  # 세로 기준 리사이즈
+            resized_height = canvas_height
+            resized_width = int(canvas_height * aspect_ratio)
+
+        resized_frame = cv2.resize(processed_frame, (resized_width, resized_height), interpolation=cv2.INTER_LANCZOS4)
+
         # 캔버스에 표시
-        frame_image = ImageTk.PhotoImage(Image.fromarray(processed_frame))
+        self.canvas.delete("all")  # 기존 캔버스 내용 삭제
+        frame_image = ImageTk.PhotoImage(Image.fromarray(resized_frame))
         self.canvas.create_image(0, 0, anchor=tk.NW, image=frame_image)
         self.canvas.image = frame_image
 
@@ -189,7 +216,7 @@ class TiltShiftApp:
         이미지 중심선 및 범위 선 업데이트
         """
         if self.original_image:
-            canvas_width, canvas_height = 700, 400
+            canvas_width, canvas_height = 800, 450
             height = self.original_image.size[1]
 
             # 슬라이더 값 변환
@@ -210,7 +237,7 @@ class TiltShiftApp:
         """
         동영상 중심선 및 범위 선 업데이트
         """
-        canvas_width, canvas_height = 700, 400
+        canvas_width, canvas_height = 800, 450
 
         # 슬라이더 값 변환 (패딩 포함)
         focus_position_canvas = self.focus_position_slider.get()
@@ -232,13 +259,13 @@ class TiltShiftApp:
         if self.original_image is not None:
             height = self.original_image.size[1]
         elif self.video_playing:
-            height = 400  # 동영상 캔버스 기준 높이
+            height = 450  # 동영상 캔버스 기준 높이
         else:
             return
 
         # 슬라이더 값 변환
-        focus_position = int(self.focus_position_slider.get() * height / 400)
-        focus_width = int(self.focus_width_slider.get() * height / 400)
+        focus_position = int(self.focus_position_slider.get() * height / 450)
+        focus_width = int(self.focus_width_slider.get() * height / 450)
         blur_strength = int(self.blur_strength_slider.get())
         enhance = self.enhance_var.get()
 
@@ -247,7 +274,7 @@ class TiltShiftApp:
             tilt_shift_result = self.tilt_shift(np_image, focus_position, focus_width, blur_strength, enhance)
             self.result_image = Image.fromarray(tilt_shift_result)
             self.display_image(self.result_image)  # 결과 이미지 표시
-            self.update_canvas(700, 400, focus_position, focus_width, height)
+            self.update_canvas(800, 450, focus_position, focus_width, height)
 
     def reset_image(self):
         """
@@ -290,7 +317,7 @@ class TiltShiftApp:
             return
 
         cap = cv2.VideoCapture(self.original_filename)  # 원본 동영상 열기
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # MP4 코덱 설정
+        fourcc = cv2.CAP_PROP_FOURCC  # 코덱 설정
         fps = int(cap.get(cv2.CAP_PROP_FPS))  # 프레임 속도 가져오기
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))  # 원본 동영상 너비
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))  # 원본 동영상 높이
@@ -441,6 +468,7 @@ class TiltShiftApp:
         enhanced_image = contrast_enhancer.enhance(0.8)
 
         return np.array(enhanced_image, dtype=np.uint8)
+
 
 if __name__ == "__main__":
     root = tk.Tk()
