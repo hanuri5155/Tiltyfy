@@ -190,22 +190,28 @@ class ImageVideoProcessor:
 
         # 작업 순서대로 적용
         for operation in self.operation_stack:
-            if operation['type'] == 'grayscale':
+            if operation['type'] == 'grayscale': # 흑백 처리
                 temp_image = cv2.cvtColor(temp_image, cv2.COLOR_BGR2GRAY)
                 temp_image = cv2.cvtColor(temp_image, cv2.COLOR_GRAY2BGR)
-            elif operation['type'] == 'blur':
+
+            elif operation['type'] == 'blur':   # 블러 처리
                 kernel_size = operation.get('kernel', 5)
                 temp_image = cv2.GaussianBlur(temp_image, (kernel_size, kernel_size), 0)
-            elif operation['type'] == 'resize':
+
+            elif operation['type'] == 'resize': # 크키 조정
                 width, height = operation.get('size', (temp_image.shape[1], temp_image.shape[0]))
                 temp_image = cv2.resize(temp_image, (width, height))
-            elif operation['type'] == 'flip_horizontal':
+
+            elif operation['type'] == 'flip_horizontal': # 좌우 대칭
                 temp_image = cv2.flip(temp_image, 1)
-            elif operation['type'] == 'flip_vertical':
+
+            elif operation['type'] == 'flip_vertical':  # 상하 대칭
                 temp_image = cv2.flip(temp_image, 0)
-            elif operation['type'] == 'rotate_right':
+
+            elif operation['type'] == 'rotate_right':   # +90도 회전
                 temp_image = self.rotate_and_resize(temp_image, 90)
-            elif operation['type'] == 'rotate_left':
+
+            elif operation['type'] == 'rotate_left':    # -90도 회전
                 temp_image = self.rotate_and_resize(temp_image, -90)
 
         self.current_image = temp_image
@@ -317,7 +323,7 @@ class ImageVideoProcessor:
         rotation_matrix[0, 2] += (new_width / 2) - center[0]
         rotation_matrix[1, 2] += (new_height / 2) - center[1]
 
-        # 회전 적용
+        # warpAffine 함수를 사용한 회전 적용
         rotated_img = cv2.warpAffine(img, rotation_matrix, (new_width, new_height))
 
         # 사용자 Resize 여부에 따라 리사이즈 적용

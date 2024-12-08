@@ -29,15 +29,18 @@ def create_preview_gif(image_files):
     """
     try:
         frames = []
+
+        # 첫 번째 이미지의 사이즈를 기준 사이즈로 설정
         base_image = Image.open(image_files[0])
         width, height = base_image.size
 
+        # 각 이미지를 기준 이미지로 리사이즈 후 프레임에 리스트에 추가
         for img_path in image_files:
             img = Image.open(img_path)
             img_resized = img.resize((width, height))
             frames.append(img_resized)
 
-        # 임시 GIF 생성 경로
+        # GIF 생성
         temp_gif_path = "temp_preview.gif"
         frames[0].save(temp_gif_path, format="GIF",
                        save_all=True, append_images=frames[1:],

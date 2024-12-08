@@ -15,7 +15,7 @@ class TiltShiftApp:
         # 루트 창 설정
         self.root = root
         self.root.title("Tiltypy Studio")  # 애플리케이션 제목 설정
-        self.root.geometry("900x950")  # 창 크기 설정
+        self.root.geometry("900x960")  # 창 크기 설정
         self.root.configure(bg="#f0f0f5")  # 배경 색상 설정
 
         # 커스텀 폰트 설정
@@ -423,15 +423,19 @@ class TiltShiftApp:
         # 블러 처리 시작 범위를 초점 너비에 비례하여 설정
         blur_start = focus_width * 1.5
 
+        # 마스크 값 설정
         for i in range(height):
             distance = abs(i - focus_position)
 
             if distance <= focus_width:
+                # 초점 중심선 부근은 선명하게 설정 (값 = 1)
                 mask[i, :] = 1
             elif distance <= focus_width + blur_start:
+                # 초점 경계선 근처 까지는 점점 흐리게 설정
                 decay_factor = (distance - focus_width) / blur_start
                 mask[i, :] = max(0, 1 - decay_factor)
             else:
+                # 초점 경계선 외부의 경우 완전히 흐리게 설정 (값 = 0)
                 mask[i, :] = 0
 
         # 블러 처리

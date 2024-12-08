@@ -6,6 +6,9 @@ import numpy as np
 
 
 def refine_edges(edges):
+    """
+    끊어진 경계선을 연결하기위한 닫힘 연산 함수
+    """
     kernel = np.ones((10, 10), np.uint8)
     closed_edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
     refined_edges = cv2.dilate(closed_edges, kernel, iterations=1)
@@ -14,16 +17,23 @@ def refine_edges(edges):
 
 
 def remove_background(image, edges):
+    # 외부 경계선 찾기
     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
     if not contours:
         raise ValueError("No contours found.")
 
+    # 가장 면적이 큰 경계선을 찾기
     largest_contour = max(contours, key=cv2.contourArea)
 
     mask = np.zeros_like(edges, dtype=np.uint8)
+
+    # 객체영역은 흰색으로(255), 나머지 배경부분은 검정색(0)으로 채우기
     cv2.drawContours(mask, [largest_contour], -1, 255, thickness=cv2.FILLED)
 
     image_rgba = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
+
+    # 이미지에서 값이 0인부분, 즉 배경부분에 대한 투명화 처리
     image_rgba[mask == 0, 3] = 0
 
     return Image.fromarray(cv2.cvtColor(image_rgba, cv2.COLOR_BGRA2RGBA))
@@ -36,7 +46,10 @@ def update_edge_preview(lower_threshold, upper_threshold):
         return
 
     gray = cv2.cvtColor(current_image, cv2.COLOR_BGR2GRAY)
+
+    # 경계선의 강도 구분
     edges = cv2.Canny(gray, lower_threshold, upper_threshold)
+
     refined_edges = refine_edges(edges)
 
     # 경계선 이미지 표시
